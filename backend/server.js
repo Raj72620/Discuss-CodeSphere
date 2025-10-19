@@ -25,9 +25,9 @@ const server = createServer(app);
 // CORS configuration with environment variables
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://your-netlify-app-name.netlify.app',
-  process.env.FRONTEND_URL // Add environment variable for frontend URL
-].filter(Boolean); // Remove any undefined values
+  'https://discusshubb.netlify.app',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
 // OLD CODE - Commented out
 // const io = new Server(server, {
