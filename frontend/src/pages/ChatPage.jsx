@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Layout from '../components/Layout/Layout';
 import { toast } from 'react-hot-toast';
-import { chatAPI } from '../services/chatAPI';
+import { API_BASE_URL } from '../config/api';
 
 const ChatPage = () => {
   const { userId } = useParams();
@@ -47,27 +47,42 @@ const ChatPage = () => {
   const startConversation = async () => {
     try {
       setIsLoading(true);
-      console.log('Starting conversation with user:', userId);
+      
+      // First, create or get conversation
+      
+      // OLD CODE - Commented out
+      // const conversationResponse = await fetch('http://localhost:5000/api/chat/conversations', {
+      
+      // NEW CODE - Using environment variable
+      const conversationResponse = await fetch(`${API_BASE_URL}/api/chat/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ participantId: userId })
+      });
 
-      // Use the chatAPI service instead of direct fetch
-      const conversationData = await chatAPI.getOrCreateConversation(userId);
+      const conversationData = await conversationResponse.json();
+
+      if (!conversationResponse.ok) {
+        // Handle specific error cases
+        if (conversationResponse.status === 409) {
+          // Conversation exists but had retrieval issues
+          toast.error('Conversation issue detected. Please try again.');
+          return;
+        }
+        throw new Error(conversationData.message || 'Failed to start conversation');
+      }
+
       setConversation(conversationData.conversation);
 
-      // Then load messages using chatAPI
+      // Then load messages
       await loadMessages(conversationData.conversation._id);
 
     } catch (error) {
       console.error('Error starting conversation:', error);
-      
-      // Better error handling
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else if (error.message?.includes('Network Error')) {
-        toast.error('Cannot connect to server. Please check your internet connection.');
-      } else {
-        toast.error('Failed to start conversation. Please try again.');
-      }
-      
+      toast.error(error.message || 'Failed to start conversation');
       navigate('/contributors');
     } finally {
       setIsLoading(false);
@@ -76,9 +91,24 @@ const ChatPage = () => {
 
   const loadMessages = async (conversationId) => {
     try {
-      // USE chatAPI SERVICE
-      const data = await chatAPI.getConversationMessages(conversationId);
+      
+      // OLD CODE - Commented out
+      // const response = await fetch(`http://localhost:5000/api/chat/conversations/${conversationId}/messages`, {
+      
+      // NEW CODE - Using environment variable
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load messages');
+      }
+
+      const data = await response.json();
       setMessages(data.messages || []);
+
     } catch (error) {
       console.error('Error loading messages:', error);
       toast.error('Failed to load messages');
@@ -93,14 +123,28 @@ const ChatPage = () => {
     try {
       setIsSending(true);
       
-      const messageData = {
-        conversationId: conversation._id,
-        content: newMessage.trim(),
-        messageType: 'text'
-      };
+      // OLD CODE - Commented out
+      // const response = await fetch('http://localhost:5000/api/chat/messages', {
+      
+      // NEW CODE - Using environment variable
+      const response = await fetch(`${API_BASE_URL}/api/chat/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          conversationId: conversation._id,
+          content: newMessage.trim(),
+          messageType: 'text'
+        })
+      });
 
-      // USE chatAPI SERVICE
-      const data = await chatAPI.sendMessage(messageData);
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      const data = await response.json();
       
       // Add new message to the list
       setMessages(prev => [...prev, data.message]);
@@ -108,12 +152,7 @@ const ChatPage = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Failed to send message');
-      }
+      toast.error('Failed to send message');
     } finally {
       setIsSending(false);
     }
