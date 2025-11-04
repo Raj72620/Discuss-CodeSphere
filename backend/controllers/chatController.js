@@ -79,7 +79,10 @@ const getUserConversations = async (req, res) => {
       isActive: true
     })
     .populate('participants', 'username avatarUrl isOnline lastSeen')
-    .populate('lastMessage')
+    .populate({
+      path: 'lastMessage',
+      match: { isDeleted: false }
+    })
     .sort({ lastMessageAt: -1 })
     .lean();
 

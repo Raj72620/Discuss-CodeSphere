@@ -10,7 +10,7 @@ class SocketService {
 
   connect() {
     if (!this.socket) {
-      // OLD CODE - Commented out
+
       // this.socket = io('http://localhost:5000', {
       
       const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
