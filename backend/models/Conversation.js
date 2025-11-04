@@ -34,14 +34,21 @@ conversationSchema.methods.isParticipant = function(userId) {
   );
 };
 
+
 // Static method to find conversation by participants - FIXED VERSION
 conversationSchema.statics.findByParticipants = async function(userId1, userId2) {
   try {
     // Sort the participant IDs to ensure consistent lookup
     const sortedParticipants = [userId1, userId2].sort();
     
+    // Convert to ObjectId for proper comparison
+    const participantIds = sortedParticipants.map(id => new mongoose.Types.ObjectId(id));
+    
     const conversation = await this.findOne({
-      participants: { $all: sortedParticipants },
+      participants: { 
+        $all: participantIds,
+        $size: 2 
+      },
       isActive: true
     });
     
@@ -51,25 +58,42 @@ conversationSchema.statics.findByParticipants = async function(userId1, userId2)
     throw error;
   }
 };
-
-// Static method to find or create conversation
+// Static method to find or create conversation - FIXED VERSION
 conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
-  // Sort the participant IDs to ensure consistency
-  const sortedParticipants = [userId1, userId2].sort();
-  
-  let conversation = await this.findOne({
-    participants: { $all: sortedParticipants },
-    isActive: true
-  });
-
-  if (!conversation) {
-    conversation = new this({
-      participants: sortedParticipants
+  try {
+    // Sort the participant IDs to ensure consistency
+    const sortedParticipants = [userId1, userId2].sort();
+    
+    console.log('Looking for conversation with participants:', sortedParticipants);
+    
+    // Convert to ObjectId for proper comparison
+    const participantIds = sortedParticipants.map(id => new mongoose.Types.ObjectId(id));
+    
+    // Find existing conversation
+    let conversation = await this.findOne({
+      participants: { 
+        $all: participantIds,
+        $size: 2 
+      },
+      isActive: true
     });
-    await conversation.save();
-  }
 
-  return conversation;
+    console.log('Found conversation:', conversation?._id);
+
+    if (!conversation) {
+      console.log('Creating new conversation...');
+      conversation = new this({
+        participants: sortedParticipants
+      });
+      await conversation.save();
+      console.log('New conversation created:', conversation._id);
+    }
+
+    return conversation;
+  } catch (error) {
+    console.error('findOrCreate error:', error);
+    throw error;
+  }
 };
 
 module.exports = mongoose.model('Conversation', conversationSchema);

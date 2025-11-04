@@ -10,7 +10,6 @@ const Post = require('../models/Post');
 // @access  Private
 
 
-
 const getOrCreateConversation = async (req, res) => {
   try {
     const { participantId } = req.body;
@@ -35,10 +34,10 @@ const getOrCreateConversation = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Use findOrCreate to handle duplicates gracefully
+    // Use the fixed findOrCreate method
     console.log('Finding or creating conversation...');
     const conversation = await Conversation.findOrCreate(userId, participantId);
-    console.log('Conversation found/created:', conversation._id);
+    console.log('Conversation result:', conversation._id);
 
     // Populate the participants
     await conversation.populate('participants', 'username avatarUrl isOnline lastSeen');
@@ -46,28 +45,19 @@ const getOrCreateConversation = async (req, res) => {
     console.log('=== CHAT DEBUG END - SUCCESS ===');
     res.json({ 
       conversation,
-      message: 'Conversation ready'
+      message: conversation.isNew ? 'New conversation started' : 'Existing conversation found'
     });
 
   } catch (error) {
     console.log('=== CHAT DEBUG END - ERROR ===');
     console.error('Get or create conversation error:', error);
     
-    // Handle duplicate key error specifically
+    // Handle specific errors
     if (error.code === 11000) {
-      // Try to find the existing conversation
-      try {
-        const existingConversation = await Conversation.findByParticipants(req.user._id, req.body.participantId);
-        if (existingConversation) {
-          await existingConversation.populate('participants', 'username avatarUrl isOnline lastSeen');
-          return res.json({ 
-            conversation: existingConversation,
-            message: 'Existing conversation found'
-          });
-        }
-      } catch (findError) {
-        console.error('Error finding existing conversation:', findError);
-      }
+      return res.status(409).json({ 
+        message: 'Conversation already exists between these users',
+        error: 'DUPLICATE_CONVERSATION'
+      });
     }
     
     res.status(500).json({ 

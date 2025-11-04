@@ -13,7 +13,6 @@ class SocketService {
       // OLD CODE - Commented out
       // this.socket = io('http://localhost:5000', {
       
-      // NEW CODE - Using environment variable
       const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       this.socket = io(serverUrl, {
         transports: ['websocket']
