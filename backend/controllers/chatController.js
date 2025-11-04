@@ -35,7 +35,11 @@ const getOrCreateConversation = async (req, res) => {
     // Use findOrCreate to handle duplicates gracefully
     console.log('Finding or creating conversation...');
     const conversation = await Conversation.findOrCreate(userId, participantId);
-    console.log('Conversation found/created:', conversation._id);
+    console.log('Conversation found/created:', conversation?._id);
+
+    if (!conversation) {
+      throw new Error('Failed to create or find conversation');
+    }
 
     // Populate the participants
     await conversation.populate('participants', 'username avatarUrl isOnline lastSeen');
@@ -50,38 +54,51 @@ const getOrCreateConversation = async (req, res) => {
     console.log('=== CHAT DEBUG END - ERROR ===');
     console.error('Get or create conversation error:', error);
     
-    // Handle duplicate key error specifically with better recovery
+    // Handle duplicate key error specifically with multiple recovery attempts
     if (error.code === 11000 || error.message.includes('duplicate key')) {
-      console.log('Duplicate conversation detected, finding existing one...');
+      console.log('🔄 Duplicate key error detected, attempting recovery...');
       
-      // Try to find the existing conversation with multiple approaches
       try {
+        // Try multiple recovery methods
         let existingConversation = await Conversation.findByParticipants(req.user._id, req.body.participantId);
         
         if (!existingConversation) {
-          // Try alternative search method
+          console.log('🔄 Trying forceFindByParticipants...');
+          existingConversation = await Conversation.forceFindByParticipants(req.user._id, req.body.participantId);
+        }
+        
+        if (!existingConversation) {
+          console.log('🔄 Trying alternative search method...');
           existingConversation = await Conversation.findOne({
-            participants: { $all: [req.user._id, req.body.participantId] },
-            isActive: true
+            $and: [
+              { participants: req.user._id },
+              { participants: req.body.participantId },
+              { isActive: true }
+            ]
           });
         }
         
         if (existingConversation) {
           await existingConversation.populate('participants', 'username avatarUrl isOnline lastSeen');
-          console.log('Recovered existing conversation:', existingConversation._id);
+          console.log('✅ Successfully recovered existing conversation:', existingConversation._id);
           return res.json({ 
             conversation: existingConversation,
-            message: 'Existing conversation found'
+            message: 'Existing conversation recovered'
+          });
+        } else {
+          console.log('❌ Could not find existing conversation despite duplicate error');
+          return res.status(409).json({ 
+            message: 'Conversation exists but could not be retrieved. Please try again.',
+            error: 'Conversation recovery failed'
           });
         }
-      } catch (findError) {
-        console.error('Error finding existing conversation:', findError);
+      } catch (recoveryError) {
+        console.error('❌ Error during conversation recovery:', recoveryError);
+        return res.status(500).json({ 
+          message: 'Error recovering existing conversation',
+          error: recoveryError.message
+        });
       }
-      
-      return res.status(409).json({ 
-        message: 'Conversation already exists but could not be retrieved',
-        error: 'Duplicate conversation'
-      });
     }
     
     res.status(500).json({ 
@@ -115,7 +132,6 @@ const getUserConversations = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching conversations' });
   }
 };
-
 // @desc    Get messages in a conversation
 // @route   GET /api/chat/conversations/:conversationId/messages
 // @access  Private
