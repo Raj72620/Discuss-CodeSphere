@@ -59,41 +59,48 @@ conversationSchema.statics.findByParticipants = async function(userId1, userId2)
   }
 };
 // Static method to find or create conversation - FIXED VERSION
+
 conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
   try {
-    // Sort the participant IDs to ensure consistency
-    const sortedParticipants = [userId1, userId2].sort();
+    const session = await mongoose.startSession();
+    session.startTransaction();
     
-    console.log('Looking for conversation with participants:', sortedParticipants);
-    
-    // Convert to ObjectId for proper comparison
-    const participantIds = sortedParticipants.map(id => new mongoose.Types.ObjectId(id));
-    
-    // Find existing conversation
-    let conversation = await this.findOne({
-      participants: { 
-        $all: participantIds,
-        $size: 2 
-      },
-      isActive: true
-    });
+    try {
+      // Sort participants for consistency
+      const sortedParticipants = [userId1, userId2]
+        .map(id => new mongoose.Types.ObjectId(id))
+        .sort();
 
-    console.log('Found conversation:', conversation?._id);
+      // Look for existing conversation
+      let conversation = await this.findOne({
+        participants: { 
+          $all: sortedParticipants,
+          $size: 2 
+        },
+        isActive: true
+      }).session(session);
 
-    if (!conversation) {
-      console.log('Creating new conversation...');
-      conversation = new this({
-        participants: sortedParticipants
-      });
-      await conversation.save();
-      console.log('New conversation created:', conversation._id);
+      if (!conversation) {
+        // Create new conversation
+        conversation = new this({
+          participants: sortedParticipants
+        });
+        await conversation.save({ session });
+      }
+
+      await session.commitTransaction();
+      return conversation;
+
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
 
-    return conversation;
   } catch (error) {
-    console.error('findOrCreate error:', error);
+    console.error('findOrCreate transaction error:', error);
     throw error;
   }
 };
-
 module.exports = mongoose.model('Conversation', conversationSchema);

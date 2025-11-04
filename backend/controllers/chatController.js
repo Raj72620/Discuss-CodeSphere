@@ -11,7 +11,11 @@ const Post = require('../models/Post');
 
 
 const getOrCreateConversation = async (req, res) => {
+  const session = await mongoose.startSession();
+  
   try {
+    session.startTransaction();
+    
     const { participantId } = req.body;
     const userId = req.user._id;
 
@@ -19,36 +23,59 @@ const getOrCreateConversation = async (req, res) => {
     console.log('User ID:', userId);
     console.log('Participant ID:', participantId);
 
-    // Validate input
-    if (!participantId) {
-      return res.status(400).json({ message: 'Participant ID is required' });
+    // Enhanced validation
+    if (!participantId || !mongoose.Types.ObjectId.isValid(participantId)) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        message: 'Valid participant ID is required',
+        error: 'INVALID_PARTICIPANT_ID'
+      });
     }
 
     if (userId.toString() === participantId) {
-      return res.status(400).json({ message: 'Cannot start conversation with yourself' });
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        message: 'Cannot start conversation with yourself',
+        error: 'SELF_CONVERSATION'
+      });
     }
 
     // Check if participant exists
-    const participant = await User.findById(participantId);
+    const participant = await User.findById(participantId).session(session);
     if (!participant) {
-      return res.status(404).json({ message: 'User not found' });
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        message: 'User not found',
+        error: 'PARTICIPANT_NOT_FOUND'
+      });
     }
 
-    // Use the fixed findOrCreate method
-    console.log('Finding or creating conversation...');
-    const conversation = await Conversation.findOrCreate(userId, participantId);
-    console.log('Conversation result:', conversation._id);
+    // Find or create conversation with transaction
+    const conversation = await Conversation.findByParticipants(userId, participantId).session(session);
+    let isNew = false;
 
-    // Populate the participants
+    if (!conversation) {
+      isNew = true;
+      conversation = new Conversation({
+        participants: [userId, participantId].sort()
+      });
+      await conversation.save({ session });
+    }
+
     await conversation.populate('participants', 'username avatarUrl isOnline lastSeen');
 
+    await session.commitTransaction();
+    
     console.log('=== CHAT DEBUG END - SUCCESS ===');
     res.json({ 
       conversation,
-      message: conversation.isNew ? 'New conversation started' : 'Existing conversation found'
+      isNew,
+      message: isNew ? 'New conversation started' : 'Existing conversation found'
     });
 
   } catch (error) {
+    await session.abortTransaction();
+    
     console.log('=== CHAT DEBUG END - ERROR ===');
     console.error('Get or create conversation error:', error);
     
@@ -60,10 +87,19 @@ const getOrCreateConversation = async (req, res) => {
       });
     }
     
+    if (error.name === 'CastError') {
+      return res.status(400).json({ 
+        message: 'Invalid user ID format',
+        error: 'INVALID_ID_FORMAT'
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Server error while creating conversation',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
+  } finally {
+    session.endSession();
   }
 };
 
