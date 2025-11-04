@@ -1,4 +1,4 @@
-// backend/models/Conversation.js
+// backend/models/Conversation.js - REPLACE ENTIRE FILE
 
 const mongoose = require('mongoose');
 
@@ -24,7 +24,7 @@ const conversationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Remove the unique index completely and use a sparse index instead
+// REMOVE the unique index - it's causing the 500 error
 conversationSchema.index({ participants: 1 });
 
 // Method to check if user is participant
@@ -34,73 +34,55 @@ conversationSchema.methods.isParticipant = function(userId) {
   );
 };
 
-
-// Static method to find conversation by participants - FIXED VERSION
+// Static method to find conversation by participants
 conversationSchema.statics.findByParticipants = async function(userId1, userId2) {
   try {
-    // Sort the participant IDs to ensure consistent lookup
-    const sortedParticipants = [userId1, userId2].sort();
-    
-    // Convert to ObjectId for proper comparison
-    const participantIds = sortedParticipants.map(id => new mongoose.Types.ObjectId(id));
-    
-    const conversation = await this.findOne({
+    const participantIds = [userId1, userId2]
+      .map(id => new mongoose.Types.ObjectId(id))
+      .sort();
+
+    return await this.findOne({
       participants: { 
         $all: participantIds,
         $size: 2 
       },
       isActive: true
     });
-    
-    return conversation;
   } catch (error) {
     console.error('findByParticipants error:', error);
     throw error;
   }
 };
-// Static method to find or create conversation - FIXED VERSION
 
+// Static method to find or create conversation
 conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
   try {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    
-    try {
-      // Sort participants for consistency
-      const sortedParticipants = [userId1, userId2]
-        .map(id => new mongoose.Types.ObjectId(id))
-        .sort();
+    const participantIds = [userId1, userId2]
+      .map(id => new mongoose.Types.ObjectId(id))
+      .sort();
 
-      // Look for existing conversation
-      let conversation = await this.findOne({
-        participants: { 
-          $all: sortedParticipants,
-          $size: 2 
-        },
-        isActive: true
-      }).session(session);
+    // Try to find existing conversation
+    let conversation = await this.findOne({
+      participants: { 
+        $all: participantIds,
+        $size: 2 
+      },
+      isActive: true
+    });
 
-      if (!conversation) {
-        // Create new conversation
-        conversation = new this({
-          participants: sortedParticipants
-        });
-        await conversation.save({ session });
-      }
-
-      await session.commitTransaction();
-      return conversation;
-
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    if (!conversation) {
+      // Create new conversation
+      conversation = new this({
+        participants: participantIds
+      });
+      await conversation.save();
     }
 
+    return conversation;
   } catch (error) {
-    console.error('findOrCreate transaction error:', error);
+    console.error('findOrCreate error:', error);
     throw error;
   }
 };
+
 module.exports = mongoose.model('Conversation', conversationSchema);

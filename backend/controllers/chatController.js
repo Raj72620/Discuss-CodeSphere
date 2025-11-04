@@ -1,5 +1,7 @@
 // backend/controllers/chatController.js
 
+
+const mongoose = require('mongoose'); 
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -9,13 +11,8 @@ const Post = require('../models/Post');
 // @route   POST /api/chat/conversations
 // @access  Private
 
-
 const getOrCreateConversation = async (req, res) => {
-  const session = await mongoose.startSession();
-  
   try {
-    session.startTransaction();
-    
     const { participantId } = req.body;
     const userId = req.user._id;
 
@@ -25,7 +22,6 @@ const getOrCreateConversation = async (req, res) => {
 
     // Enhanced validation
     if (!participantId || !mongoose.Types.ObjectId.isValid(participantId)) {
-      await session.abortTransaction();
       return res.status(400).json({ 
         message: 'Valid participant ID is required',
         error: 'INVALID_PARTICIPANT_ID'
@@ -33,7 +29,6 @@ const getOrCreateConversation = async (req, res) => {
     }
 
     if (userId.toString() === participantId) {
-      await session.abortTransaction();
       return res.status(400).json({ 
         message: 'Cannot start conversation with yourself',
         error: 'SELF_CONVERSATION'
@@ -41,67 +36,54 @@ const getOrCreateConversation = async (req, res) => {
     }
 
     // Check if participant exists
-    const participant = await User.findById(participantId).session(session);
+    const participant = await User.findById(participantId);
     if (!participant) {
-      await session.abortTransaction();
       return res.status(404).json({ 
         message: 'User not found',
         error: 'PARTICIPANT_NOT_FOUND'
       });
     }
 
-    // Find or create conversation with transaction
-    const conversation = await Conversation.findByParticipants(userId, participantId).session(session);
-    let isNew = false;
-
-    if (!conversation) {
-      isNew = true;
-      conversation = new Conversation({
-        participants: [userId, participantId].sort()
-      });
-      await conversation.save({ session });
-    }
-
+    // SIMPLIFIED: Use findOrCreate without transaction
+    const conversation = await Conversation.findOrCreate(userId, participantId);
+    
     await conversation.populate('participants', 'username avatarUrl isOnline lastSeen');
 
-    await session.commitTransaction();
-    
     console.log('=== CHAT DEBUG END - SUCCESS ===');
+    console.log('Conversation ID:', conversation._id);
+    
     res.json({ 
       conversation,
-      isNew,
-      message: isNew ? 'New conversation started' : 'Existing conversation found'
+      message: 'Conversation ready'
     });
 
   } catch (error) {
-    await session.abortTransaction();
-    
     console.log('=== CHAT DEBUG END - ERROR ===');
     console.error('Get or create conversation error:', error);
+    console.error('Error stack:', error.stack);
     
     // Handle specific errors
     if (error.code === 11000) {
-      return res.status(409).json({ 
-        message: 'Conversation already exists between these users',
-        error: 'DUPLICATE_CONVERSATION'
-      });
-    }
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        message: 'Invalid user ID format',
-        error: 'INVALID_ID_FORMAT'
-      });
+      // If still getting duplicate error, try to find existing conversation
+      try {
+        const conversation = await Conversation.findByParticipants(req.user._id, req.body.participantId);
+        if (conversation) {
+          await conversation.populate('participants', 'username avatarUrl isOnline lastSeen');
+          return res.json({ conversation });
+        }
+      } catch (findError) {
+        console.error('Error finding existing conversation:', findError);
+      }
     }
     
     res.status(500).json({ 
       message: 'Server error while creating conversation',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
-  } finally {
-    session.endSession();
   }
 };
+
+
 
 // @desc    Get user's conversations
 // @route   GET /api/chat/conversations
