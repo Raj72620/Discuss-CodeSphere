@@ -67,11 +67,10 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  maxAge: '1d', // Cache for 1 day
-  etag: true,
-  lastModified: true
-}));
+// Serve static files from uploads directory
+// Ensure specific handling for posts directory if needed
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads/posts', express.static(path.join(__dirname, 'uploads/posts')));
 
 // Routes
 app.use('/api/auth', authRoutes);
