@@ -25,6 +25,9 @@ const server = createServer(app);
 // CORS configuration with environment variables
 const allowedOrigins = [
   'https://discusshubb.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -83,7 +86,7 @@ app.use('/api', uploadRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'CodeSphere API is running!',
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     timestamp: new Date().toISOString(),
@@ -130,7 +133,7 @@ io.on('connection', (socket) => {
     try {
       // Broadcast to all users in the conversation
       io.to(`conversation_${messageData.conversation}`).emit('new-message', messageData);
-      
+
       // Notify other participant about new message
       messageData.participants.forEach(participantId => {
         if (participantId !== messageData.sender._id) {
@@ -185,6 +188,9 @@ const connectDB = async () => {
     console.log('✅ MongoDB Atlas connected successfully');
     console.log('📊 Database:', mongoose.connection.name);
     console.log('🎯 Host:', mongoose.connection.host);
+
+    // FIX: Index cleanup code removed to prevent startup crash.
+    // We will handle this separately if needed.
   } catch (error) {
     console.error('❌ Database connection error:', error.message);
     process.exit(1);

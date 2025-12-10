@@ -17,37 +17,48 @@ const conversationSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  // Unique key to prevent duplicates: "userId1_userId2" (sorted)
+  conversationKey: {
+    type: String,
+    unique: true
   }
 }, {
   timestamps: true
 });
 
-// Create a compound index that allows multiple conversations but prevents exact duplicates
-conversationSchema.index({ participants: 1 }, { 
-  unique: true
+// Pre-save middleware to generate conversationKey
+conversationSchema.pre('save', function (next) {
+  if (this.isModified('participants')) {
+    const sortedIds = this.participants
+      .map(id => id.toString())
+      .sort();
+    this.conversationKey = sortedIds.join('_');
+  }
+  next();
 });
 
 // Method to check if user is participant
-conversationSchema.methods.isParticipant = function(userId) {
-  return this.participants.some(participant => 
+conversationSchema.methods.isParticipant = function (userId) {
+  return this.participants.some(participant =>
     participant._id.toString() === userId.toString()
   );
 };
 
 // Static method to find conversation by participants - SIMPLIFIED VERSION
-conversationSchema.statics.findByParticipants = async function(userId1, userId2) {
+conversationSchema.statics.findByParticipants = async function (userId1, userId2) {
   try {
     // Create sorted array of participant IDs for consistent lookup
     const sortedParticipants = [userId1, userId2]
       .map(id => new mongoose.Types.ObjectId(id))
       .sort((a, b) => a.toString().localeCompare(b.toString()));
-    
+
     console.log('Searching for conversation with participants:', sortedParticipants);
-    
+
     const conversation = await this.findOne({
       participants: { $all: sortedParticipants, $size: 2 }
     });
-    
+
     return conversation;
   } catch (error) {
     console.error('findByParticipants error:', error);
@@ -56,15 +67,12 @@ conversationSchema.statics.findByParticipants = async function(userId1, userId2)
 };
 
 // Static method to find or create conversation - ULTRA ROBUST VERSION
-conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
+conversationSchema.statics.findOrCreate = async function (userId1, userId2) {
   try {
     // Convert to ObjectIds and sort for consistency
     const participant1 = new mongoose.Types.ObjectId(userId1);
     const participant2 = new mongoose.Types.ObjectId(userId2);
-    const sortedParticipants = [participant1, participant2].sort((a, b) => 
+    const sortedParticipants = [participant1, participant2].sort((a, b) =>
       a.toString().localeCompare(b.toString())
     );
 
@@ -73,11 +81,10 @@ conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
     // First, try to find existing conversation
     let conversation = await this.findOne({
       participants: { $all: sortedParticipants, $size: 2 }
-    }).session(session);
+    });
 
     if (conversation) {
       console.log('✅ Found existing conversation:', conversation._id);
-      await session.commitTransaction();
       return conversation;
     }
 
@@ -87,45 +94,41 @@ conversationSchema.statics.findOrCreate = async function(userId1, userId2) {
       participants: sortedParticipants
     });
 
-    await conversation.save({ session });
-    console.log('✅ New conversation created:', conversation._id);
-    
-    await session.commitTransaction();
-    return conversation;
+    try {
+      await conversation.save();
+      console.log('✅ New conversation created:', conversation._id);
+      return conversation;
+    } catch (saveError) {
+      // If duplicate key error, it means another request created it concurrently
+      if (saveError.code === 11000) {
+        console.log('🔄 Duplicate key detected, finding existing conversation...');
+        const existingConversation = await this.findOne({
+          participants: { $all: sortedParticipants, $size: 2 }
+        });
 
-  } catch (error) {
-    await session.abortTransaction();
-    console.error('❌ Transaction error in findOrCreate:', error);
-
-    // If duplicate key error, find the existing conversation
-    if (error.code === 11000) {
-      console.log('🔄 Duplicate key detected, finding existing conversation...');
-      try {
-        const existingConversation = await this.findByParticipants(userId1, userId2);
         if (existingConversation) {
           console.log('✅ Found existing conversation after duplicate error:', existingConversation._id);
           return existingConversation;
         }
-      } catch (findError) {
-        console.error('❌ Error finding existing conversation:', findError);
       }
+      throw saveError;
     }
-    
+
+  } catch (error) {
+    console.error('❌ Error in findOrCreate:', error);
     throw error;
-  } finally {
-    session.endSession();
   }
 };
 
 // Alternative method for emergency recovery
-conversationSchema.statics.forceFindByParticipants = async function(userId1, userId2) {
+conversationSchema.statics.forceFindByParticipants = async function (userId1, userId2) {
   try {
     const conversations = await this.find({
       participants: { $all: [userId1, userId2] }
     });
-    
+
     console.log(`Found ${conversations.length} conversations with these participants`);
-    
+
     // Return the first active one, or the first one if no active found
     const activeConversation = conversations.find(conv => conv.isActive) || conversations[0];
     return activeConversation;
