@@ -5,8 +5,13 @@ import API from './api';
 export const trendingAPI = {
   // Get trending data (tags, contributors, posts)
   getTrendingData: async () => {
-    const response = await API.get('/api/search/trending');
-    return response.data;
+    try {
+      const response = await API.get('/api/search/trending');
+      return response.data;
+    } catch (error) {
+      console.warn('Trending data fetch failed:', error.message);
+      return null; // Return null to allow UI to show empty state/skeleton gracefully
+    }
   },
 
   // Get top contributors
