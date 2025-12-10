@@ -29,7 +29,7 @@ const conversationSchema = new mongoose.Schema({
 
 // Pre-save middleware to generate conversationKey
 conversationSchema.pre('save', function (next) {
-  if (this.isModified('participants')) {
+  if (this.participants && (this.isModified('participants') || !this.conversationKey)) {
     const sortedIds = this.participants
       .map(id => id.toString())
       .sort();
@@ -90,8 +90,13 @@ conversationSchema.statics.findOrCreate = async function (userId1, userId2) {
 
     // If not found, create new conversation
     console.log('🆕 Creating new conversation...');
+
+    // Generate key manually to be safe
+    const conversationKey = sortedParticipants.map(id => id.toString()).join('_');
+
     conversation = new this({
-      participants: sortedParticipants
+      participants: sortedParticipants,
+      conversationKey: conversationKey
     });
 
     try {
