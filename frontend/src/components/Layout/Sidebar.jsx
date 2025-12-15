@@ -67,19 +67,18 @@ const Sidebar = () => {
           {trendingData.topContributors?.slice(0, 5).map((contributor, index) => (
             <div key={contributor._id || index} className="flex items-center justify-between group">
               <div className="flex items-center space-x-3 flex-1 min-w-0">
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center text-white ${
-                  index === 0 ? 'bg-yellow-500' :
-                  index === 1 ? 'bg-gray-400' :
-                  index === 2 ? 'bg-amber-600' :
-                  'bg-blue-600'
-                }`}>
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center text-white ${index === 0 ? 'bg-yellow-500' :
+                    index === 1 ? 'bg-gray-400' :
+                      index === 2 ? 'bg-amber-600' :
+                        'bg-blue-600'
+                  }`}>
                   {index + 1}
                 </div>
                 <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                   {contributor.username?.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Link 
+                  <Link
                     to={`/profile/${contributor.username}`}
                     className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate block text-sm"
                   >
@@ -139,11 +138,10 @@ const Sidebar = () => {
                 <h4 className="font-medium text-gray-900 dark:text-white text-sm leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex-1 pr-2">
                   {post.title}
                 </h4>
-                <div className={`w-5 h-5 rounded text-xs font-medium flex items-center justify-center text-white flex-shrink-0 ${
-                  index === 0 ? 'bg-orange-500' : 
-                  index === 1 ? 'bg-blue-500' : 
-                  'bg-green-500'
-                }`}>
+                <div className={`w-5 h-5 rounded text-xs font-medium flex items-center justify-center text-white flex-shrink-0 ${index === 0 ? 'bg-orange-500' :
+                    index === 1 ? 'bg-blue-500' :
+                      'bg-green-500'
+                  }`}>
                   {index + 1}
                 </div>
               </div>
@@ -151,7 +149,7 @@ const Sidebar = () => {
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-1">
                     <TrendingUp size={10} />
-                    <span>{post.voteCount}</span>
+                    <span>{post.likes?.length || 0}</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <MessageSquare size={10} />

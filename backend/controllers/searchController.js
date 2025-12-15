@@ -8,14 +8,14 @@ const User = require('../models/User');
 // @access  Public
 const searchPosts = async (req, res) => {
   try {
-    const { 
-      q: searchQuery, 
-      tags, 
-      author, 
-      sortBy = 'createdAt', 
+    const {
+      q: searchQuery,
+      tags,
+      author,
+      sortBy = 'createdAt',
       sortOrder = 'desc',
-      page = 1, 
-      limit = 10 
+      page = 1,
+      limit = 10
     } = req.query;
 
     // Build search query
@@ -97,43 +97,45 @@ const searchPosts = async (req, res) => {
 // @access  Public
 const getTrendingData = async (req, res) => {
   try {
-    // Top contributors (users with most posts)
-    const topContributors = await Post.aggregate([
-      { $group: { _id: '$author', postCount: { $sum: 1 } } },
-      { $sort: { postCount: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user'
+    const [topContributors, trendingTags, recentPopularPosts] = await Promise.all([
+      // Top contributors (users with most posts)
+      Post.aggregate([
+        { $group: { _id: '$author', postCount: { $sum: 1 } } },
+        { $sort: { postCount: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            username: '$user.username',
+            avatarUrl: '$user.avatarUrl',
+            postCount: 1
+          }
         }
-      },
-      { $unwind: '$user' },
-      {
-        $project: {
-          username: '$user.username',
-          avatarUrl: '$user.avatarUrl',
-          postCount: 1
-        }
-      }
-    ]);
+      ]),
 
-    // Trending tags
-    const trendingTags = await Post.aggregate([
-      { $unwind: '$tags' },
-      { $group: { _id: '$tags', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 15 }
-    ]);
+      // Trending tags
+      Post.aggregate([
+        { $unwind: '$tags' },
+        { $group: { _id: '$tags', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 }
+      ]),
 
-    // Recent popular posts
-    const recentPopularPosts = await Post.find()
-      .populate('author', 'username avatarUrl')
-      .sort({ voteCount: -1, createdAt: -1 })
-      .limit(5)
-      .lean();
+      // Recent popular posts
+      Post.find()
+        .populate('author', 'username avatarUrl')
+        .sort({ views: -1, createdAt: -1 })
+        .limit(5)
+        .lean()
+    ]);
 
     res.json({
       topContributors,

@@ -66,17 +66,19 @@ const postSchema = new mongoose.Schema({
 });
 
 // Index for better performance
+postSchema.index({ createdAt: -1 }); // For main feed
+postSchema.index({ views: -1 }); // For sorting by popularity
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ tags: 1 });
 postSchema.index({ likes: -1 });
 
 // Method to check if user liked the post
-postSchema.methods.isLikedByUser = function(userId) {
+postSchema.methods.isLikedByUser = function (userId) {
   return this.likes.some(likeId => likeId && likeId.toString() === userId.toString());
 };
 
 // Method to check if user saved the post
-postSchema.methods.isSavedByUser = function(userId) {
+postSchema.methods.isSavedByUser = function (userId) {
   return this.savedBy.some(savedUserId => savedUserId && savedUserId.toString() === userId.toString());
 };
 
