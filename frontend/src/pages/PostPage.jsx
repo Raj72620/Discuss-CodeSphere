@@ -16,6 +16,10 @@ import {
   ArrowLeft,
   ZoomIn // Add this import for image viewing
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import remarkGfm from 'remark-gfm';
 import Layout from '../components/Layout/Layout';
 import CommentSection from '../components/Comments/CommentSection';
 import { postsAPI } from '../services/postsAPI';
@@ -123,7 +127,7 @@ const PostPage = () => {
 
   const handleShare = async () => {
     const postUrl = `${window.location.origin}/discussion/${postId}`;
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -162,7 +166,7 @@ const PostPage = () => {
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
+
     try {
       const successful = document.execCommand('copy');
       if (successful) {
@@ -265,7 +269,7 @@ const PostPage = () => {
               <span>Back to Discussions</span>
             </button>
           </div>
-          
+
           <div className="text-center py-12">
             <div className="text-red-500 text-lg mb-2">Error loading post</div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
@@ -363,10 +367,31 @@ const PostPage = () => {
           </div>
 
           <div className="mb-6">
-            <div
-              className="prose prose-lg dark:prose-invert max-w-none text-gray-900 dark:text-white mb-6"
-              dangerouslySetInnerHTML={{ __html: post.content }}
-            />
+            <ReactMarkdown
+              className="prose prose-lg dark:prose-invert max-w-none text-gray-900 dark:text-white"
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ node, inline, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      style={dracula}
+                      language={match[1]}
+                      PreTag="div"
+                      {...props}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                }
+              }}
+            >
+              {post.content}
+            </ReactMarkdown>
           </div>
 
           {/* Images Gallery */}
@@ -381,7 +406,7 @@ const PostPage = () => {
                     <img
                       // OLD CODE - Commented out
                       // src={`http://localhost:5000${image.url}`}
-                      
+
                       // NEW CODE - Using environment variable
                       src={`${API_BASE_URL}${image.url}`}
                       alt={`Post image ${index + 1}`}
@@ -409,11 +434,10 @@ const PostPage = () => {
               <button
                 onClick={handleLike}
                 disabled={isLiking}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  isLiked
-                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900'
-                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${isLiked
+                  ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900'
+                  }`}
               >
                 <Heart size={20} className={isLiked ? 'fill-current' : ''} />
                 <span className="font-semibold">{post.likeCount || 0}</span>
@@ -440,16 +464,15 @@ const PostPage = () => {
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  isSaved
-                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900'
-                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${isSaved
+                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900'
+                  }`}
               >
                 <Bookmark size={18} className={isSaved ? 'fill-current' : ''} />
                 <span>{isSaved ? 'Saved' : 'Save'}</span>
               </button>
-              <button 
+              <button
                 onClick={handleShare}
                 className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 hover:text-blue-600 transition-colors"
               >
