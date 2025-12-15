@@ -18,15 +18,15 @@ const getPosts = async (req, res) => {
 
     // Build query object
     let query = {};
-    
+
     if (tag) {
       query.tags = { $in: [tag.toLowerCase()] };
     }
-    
+
     if (author) {
       query.author = author;
     }
-    
+
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -40,7 +40,7 @@ const getPosts = async (req, res) => {
     // Get posts with author population and pagination
     const posts = await Post.find(query)
       .populate('author', 'username avatarUrl')
-      .sort({ [sortBy]: sortOrder })
+      .sort({ [sortBy]: sortOrder, _id: -1 }) // Add _id for tie-breaking and consistent sorting
       .skip(skip)
       .limit(limit)
       .lean();
@@ -53,7 +53,7 @@ const getPosts = async (req, res) => {
         const likesArray = post.likes || [];
         post.isLiked = likesArray.some(likeId => likeId && likeId.toString() === userId.toString());
         post.likeCount = likesArray.length;
-        
+
         // Check if user saved this post
         const savedByArray = post.savedBy || [];
         post.isSaved = savedByArray.some(savedUserId => savedUserId && savedUserId.toString() === userId.toString());
@@ -106,12 +106,12 @@ const getPostById = async (req, res) => {
     const postObj = post.toObject();
     const likesArray = post.likes || [];
     const savedByArray = post.savedBy || [];
-    
+
     if (req.user) {
-      postObj.isLiked = likesArray.some(likeId => 
+      postObj.isLiked = likesArray.some(likeId =>
         likeId && likeId.toString() === req.user._id.toString()
       );
-      postObj.isSaved = savedByArray.some(savedUserId => 
+      postObj.isSaved = savedByArray.some(savedUserId =>
         savedUserId && savedUserId.toString() === req.user._id.toString()
       );
     } else {
@@ -135,7 +135,7 @@ const getPostById = async (req, res) => {
       const userId = req.user._id;
       comments.forEach(comment => {
         const commentLikesArray = comment.likes || [];
-        comment.isLiked = commentLikesArray.some(likeId => 
+        comment.isLiked = commentLikesArray.some(likeId =>
           likeId && likeId.toString() === userId.toString()
         );
         comment.likeCount = commentLikesArray.length;
@@ -151,8 +151,8 @@ const getPostById = async (req, res) => {
     // Structure comments into nested format
     const nestComments = (comments, parentId = null) => {
       return comments
-        .filter(comment => 
-          (parentId === null && !comment.parentComment) || 
+        .filter(comment =>
+          (parentId === null && !comment.parentComment) ||
           (comment.parentComment && comment.parentComment.toString() === parentId)
         )
         .map(comment => ({
@@ -229,7 +229,7 @@ const createPost = async (req, res) => {
     }
 
     // Process tags - convert to lowercase and remove duplicates
-    const processedTags = tags ? 
+    const processedTags = tags ?
       [...new Set(tags.map(tag => tag.toLowerCase().trim()))] : [];
 
     const post = new Post({
@@ -241,7 +241,7 @@ const createPost = async (req, res) => {
     });
 
     await post.save();
-    
+
     // Populate author info for response
     await post.populate('author', 'username avatarUrl');
 

@@ -13,27 +13,40 @@ const Sidebar = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchTrendingData = async () => {
       try {
         const data = await trendingAPI.getTrendingData();
-        setTrendingData(data || {
-          topContributors: [],
-          trendingTags: [],
-          recentPopularPosts: []
-        });
+        if (isMounted) {
+          setTrendingData(data || {
+            topContributors: [],
+            trendingTags: [],
+            recentPopularPosts: []
+          });
+        }
       } catch (error) {
-        console.error('Error fetching trending data:', error);
-        setTrendingData({
-          topContributors: [],
-          trendingTags: [],
-          recentPopularPosts: []
-        });
+        // Silently fail for UI, just log warning
+        console.warn('Trending data could not be loaded:', error);
+        if (isMounted) {
+          setTrendingData({
+            topContributors: [],
+            trendingTags: [],
+            recentPopularPosts: []
+          });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchTrendingData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (isLoading) {
@@ -68,9 +81,9 @@ const Sidebar = () => {
             <div key={contributor._id || index} className="flex items-center justify-between group">
               <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <div className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center text-white ${index === 0 ? 'bg-yellow-500' :
-                    index === 1 ? 'bg-gray-400' :
-                      index === 2 ? 'bg-amber-600' :
-                        'bg-blue-600'
+                  index === 1 ? 'bg-gray-400' :
+                    index === 2 ? 'bg-amber-600' :
+                      'bg-blue-600'
                   }`}>
                   {index + 1}
                 </div>
@@ -139,8 +152,8 @@ const Sidebar = () => {
                   {post.title}
                 </h4>
                 <div className={`w-5 h-5 rounded text-xs font-medium flex items-center justify-center text-white flex-shrink-0 ${index === 0 ? 'bg-orange-500' :
-                    index === 1 ? 'bg-blue-500' :
-                      'bg-green-500'
+                  index === 1 ? 'bg-blue-500' :
+                    'bg-green-500'
                   }`}>
                   {index + 1}
                 </div>

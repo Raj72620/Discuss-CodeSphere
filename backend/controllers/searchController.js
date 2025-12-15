@@ -97,9 +97,14 @@ const searchPosts = async (req, res) => {
 // @access  Public
 const getTrendingData = async (req, res) => {
   try {
+    // Limit analysis to last 30 days for performance
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const [topContributors, trendingTags, recentPopularPosts] = await Promise.all([
-      // Top contributors (users with most posts)
+      // Top contributors (users with most posts in last 30 days)
       Post.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
         { $group: { _id: '$author', postCount: { $sum: 1 } } },
         { $sort: { postCount: -1 } },
         { $limit: 10 },
@@ -121,8 +126,9 @@ const getTrendingData = async (req, res) => {
         }
       ]),
 
-      // Trending tags
+      // Trending tags (last 30 days only)
       Post.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
         { $unwind: '$tags' },
         { $group: { _id: '$tags', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
