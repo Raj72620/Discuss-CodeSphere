@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { 
-  Send, 
-  ArrowLeft, 
-  Paperclip, 
+import {
+  Send,
+  ArrowLeft,
+  Paperclip,
   Image as ImageIcon,
   MoreVertical,
   User
@@ -36,9 +36,10 @@ const ChatPage = () => {
     startConversation();
   }, [userId, isAuthenticated]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // Auto-scroll removed to show top/latest defined by user preference or default
+  // useEffect(() => {
+  //   scrollToBottom();
+  // }, [messages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,12 +48,12 @@ const ChatPage = () => {
   const startConversation = async () => {
     try {
       setIsLoading(true);
-      
+
       // First, create or get conversation
-      
+
       // OLD CODE - Commented out
       // const conversationResponse = await fetch('http://localhost:5000/api/chat/conversations', {
-      
+
       // NEW CODE - Using environment variable
       const conversationResponse = await fetch(`${API_BASE_URL}/api/chat/conversations`, {
         method: 'POST',
@@ -91,10 +92,10 @@ const ChatPage = () => {
 
   const loadMessages = async (conversationId) => {
     try {
-      
+
       // OLD CODE - Commented out
       // const response = await fetch(`http://localhost:5000/api/chat/conversations/${conversationId}/messages`, {
-      
+
       // NEW CODE - Using environment variable
       const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`, {
         headers: {
@@ -117,15 +118,15 @@ const ChatPage = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    
+
     if (!newMessage.trim() || !conversation) return;
 
     try {
       setIsSending(true);
-      
+
       // OLD CODE - Commented out
       // const response = await fetch('http://localhost:5000/api/chat/messages', {
-      
+
       // NEW CODE - Using environment variable
       const response = await fetch(`${API_BASE_URL}/api/chat/messages`, {
         method: 'POST',
@@ -145,10 +146,11 @@ const ChatPage = () => {
       }
 
       const data = await response.json();
-      
+
       // Add new message to the list
       setMessages(prev => [...prev, data.message]);
       setNewMessage('');
+      setTimeout(scrollToBottom, 100);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -215,11 +217,11 @@ const ChatPage = () => {
             >
               <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
             </button>
-            
+
             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
               {otherParticipant.username?.charAt(0).toUpperCase()}
             </div>
-            
+
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
                 {otherParticipant.username}
@@ -256,19 +258,17 @@ const ChatPage = () => {
                 className={`flex ${message.sender._id === user.id ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                    message.sender._id === user.id
-                      ? 'bg-blue-600 text-white rounded-br-none'
-                      : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-200 dark:border-gray-700'
-                  }`}
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${message.sender._id === user.id
+                    ? 'bg-blue-600 text-white rounded-br-none'
+                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-200 dark:border-gray-700'
+                    }`}
                 >
                   <p className="text-sm">{message.content}</p>
                   <p
-                    className={`text-xs mt-1 ${
-                      message.sender._id === user.id
-                        ? 'text-blue-100'
-                        : 'text-gray-500 dark:text-gray-400'
-                    }`}
+                    className={`text-xs mt-1 ${message.sender._id === user.id
+                      ? 'text-blue-100'
+                      : 'text-gray-500 dark:text-gray-400'
+                      }`}
                   >
                     {formatMessageTime(message.createdAt)}
                   </p>
@@ -292,7 +292,7 @@ const ChatPage = () => {
                 disabled={isSending}
               />
             </div>
-            
+
             <div className="flex space-x-2">
               <button
                 type="button"
@@ -300,7 +300,7 @@ const ChatPage = () => {
               >
                 <Paperclip size={20} />
               </button>
-              
+
               <button
                 type="submit"
                 disabled={!newMessage.trim() || isSending}
